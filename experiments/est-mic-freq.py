@@ -4,6 +4,7 @@ import struct
 import audioop
 import curses
 import math
+import time
 
 stdscr = curses.initscr()
 
@@ -11,7 +12,7 @@ CHUNK = 2048
 WIDTH = 2
 CHANNELS = 1
 RATE = 44100
-RECORD_SECONDS = 60
+RECORD_SECONDS = 60 * 5
 
 SCALE = 40
 TOP = 10
@@ -20,12 +21,19 @@ HIFREQ = 1000
 LOVOL = 30
 HIVOL = 100
 
+local_max_vol_threshold = 50
+local_max_timeout = 2   # sec
+
 def main():
 
-    stdscr.addstr(TOP + 1, 0, "{0}Hz                                 {1}kHz".format(LOFREQ, HIFREQ/1000))
-    stdscr.addstr(TOP + 2, 0, "|----|----|----|----|----|----|----|----| Freq")
-    stdscr.addstr(TOP + 5, 0, "{0}dB                                 {1}dB".format(LOVOL, HIVOL))
-    stdscr.addstr(TOP + 6, 0, "|----|----|----|----|----|----|----|----| Volume")
+    local_max_freq = 0.0
+    local_max_vol = 0.0
+    local_max_time = 0.0
+
+    stdscr.addstr(TOP + 1, 0, "{0}dB                                 {1}dB".format(LOVOL, HIVOL))
+    stdscr.addstr(TOP + 2, 0, "|----|----|----|----|----|----|----|----| Volume")
+    stdscr.addstr(TOP + 5, 0, "{0}Hz                                 {1}kHz".format(LOFREQ, HIFREQ/1000))
+    stdscr.addstr(TOP + 6, 0, "|----|----|----|----|----|----|----|----| Freq")
 
     p = pyaudio.PyAudio()
 
@@ -51,9 +59,9 @@ def main():
         # get the volume
         rms = audioop.rms(data, 2)
         if (rms > 0):
-            decibel = 20 * np.log10(rms)
+            vol = 20 * np.log10(rms)
         else:
-            decibel = 0
+            vol = 0
 
         # unpack the data and times by the hamming window
         indata = np.array(struct.unpack("%dh"%(len(data)/WIDTH), data))*window
@@ -70,20 +78,57 @@ def main():
         else:
             freq = which*RATE/CHUNK
 
-        #print ("The freq is %f Hz, volume is %f db.      " % (freq, decibel))
-        if (LOFREQ < freq < HIFREQ and LOVOL < decibel < HIVOL):
-            if not math.isnan(freq) and not math.isinf(freq):
-                norm_freq = int(SCALE * ((freq - LOFREQ) / (HIFREQ - LOFREQ)))
-                freq_line = (" " * (norm_freq)) + "*" + (" " * (SCALE-norm_freq)) + "%8.0f Hz " % (freq)
-                stdscr.addstr(TOP + 3, 0, freq_line)
+        # if the last local max was > 5 sec ago, clear it
+        if time.time() > local_max_time + local_max_timeout:
+            local_max_vol = 0
+            local_max_freq = 0
+            local_max_time = time.time()
 
-        if (LOVOL < decibel < HIVOL):
-            if not math.isnan(decibel) and not math.isinf(decibel):
-                norm_vol = int(SCALE * ((decibel - LOVOL) / (HIVOL - LOVOL)))
-        else:
-            norm_vol = 0
-        vol_line = (" " * (norm_vol)) + "*" + (" " * (SCALE-norm_vol)) + "%8.0f dB " % (decibel)
-        stdscr.addstr(TOP + 7, 0, vol_line)
+        if (LOVOL < vol < HIVOL):
+            # show vol on scale
+            #   scale vol for display
+            if not math.isnan(vol) and not math.isinf(vol):
+                norm_vol = int(SCALE * ((vol - LOVOL) / (HIVOL - LOVOL)))
+            else:
+                norm_vol = 0
+            #   scale lcoal max vol for display
+            norm_local_max_vol = int(SCALE * ((local_max_vol - LOVOL) / (HIVOL - LOVOL)))
+            #   create scale
+            vol_line = " " * SCALE
+            vol_list = list(vol_line)
+            #   put vol on scale
+            vol_list[norm_vol] = '*'
+            #   put local max vol on scale
+            if norm_local_max_vol <> norm_vol:
+                vol_list[norm_local_max_vol] = '|'
+            vol_line = ''.join(vol_list)
+            stdscr.addstr(TOP + 3, 0, vol_line)
+
+        if (LOFREQ < freq < HIFREQ and LOVOL < vol < HIVOL):
+            if not math.isnan(freq) and not math.isinf(freq):
+                # calc max and display
+                if vol > local_max_vol_threshold and vol > local_max_vol:
+                    local_max_vol = vol
+                    local_max_freq = freq
+                    local_max_time = time.time()
+                # show freq on scale
+                #   scale freq for display
+                norm_freq = int(SCALE * ((freq - LOFREQ) / (HIFREQ - LOFREQ)))
+                #   scale local max freq for display
+                norm_local_max_freq = int(SCALE * ((local_max_freq - LOFREQ) / (HIFREQ - LOFREQ)))
+                #   create scale
+                freq_line = " " * SCALE
+                freq_list = list(freq_line)
+                #   put freq on scale
+                freq_list[norm_freq] = '*'
+                #   put lcoal max freq on scale
+                if norm_local_max_freq <> norm_freq:
+                    freq_list[norm_local_max_freq] = '|'
+                freq_line = ''.join(freq_list)
+                stdscr.addstr(TOP + 7, 0, freq_line)
+
+        stdscr.addstr(TOP + 9, 0, "Max freq: {0:4}Hz Max vol: {1:4}dB".format(
+            int(local_max_freq),int(local_max_vol)))
 
         stdscr.refresh()
 

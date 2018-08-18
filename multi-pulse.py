@@ -6,12 +6,21 @@
 
 # On each string, light each LED in sequence, and repeat.
 
+# visual includes
 import sys
 import select
 import opc, time
 from random import randint
 import math
 from ast import literal_eval
+# audio includes
+import pyaudio
+import numpy as np
+import struct
+import audioop
+import curses
+import math
+import time
 
 client = opc.Client('localhost:7890')
 
@@ -35,10 +44,31 @@ pulse_bkgd_color = (32,32,32)
 # idle constants
 minbright = 16   # orig 1.25
 maxbright = 128  # orig 255
-#sleeptime = 0.05    # orig 0.05
 idle_incr = 0.075 # orig 0.4
 
+# sampling constants
+CHUNK = 2048
+WIDTH = 2
+CHANNELS = 1
+RATE = 44100
+RECORD_SECONDS = 0.05
+
+# sound constants
+SCALE = 40
+TOP = 10
+LOFREQ = 100
+HIFREQ = 800
+LOVOL = 30
+HIVOL = 100
+volume_threshold = 60
+lo_freq = 100
+hi_freq = 800
+
+# color constants
+color_map = [(0, 0, 255), (0, 255, 0), (255, 0, 0)]  # [BLUE, GREEN, RED]
+
 class Field(object):
+    """FadeCandy field with idle and pulse functions"""
     def __init__(self):
         self._pulses = []
         self._pixels = []
@@ -114,14 +144,75 @@ class Field(object):
         self.light_field()
         time.sleep(sleeptime)
 
+class Audio(object):
+    """Audio object to receive input and convert to colors"""
+    def __init__(self):
+        # create a pyaudio object
+        self.p = pyaudio.PyAudio()
+        # use a Blackman window
+        self.window = np.blackman(CHUNK)
+        # open a stream to audio in
+        self.stream = self.p.open(format=self.p.get_format_from_width(WIDTH),
+                        channels=CHANNELS,
+                        rate=RATE,
+                        input=True,
+                        output=True,
+                        frames_per_buffer=CHUNK)
 
-field = Field()
+    def terminate(self):
+        self.stream.close()
+        self.p.terminate()
+
+    def estimate_freq_vol(self):
+        for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+            data = self.stream.read(CHUNK, exception_on_overflow = False)
+            # get the volume
+            rms = audioop.rms(data, 2)
+            # convert to decibels
+            if (rms > 0):
+                vol = 20 * np.log10(rms)
+            else:
+                vol = 0
+            # unpack the data and times by the hamming window
+            indata = np.array(struct.unpack("%dh"%(len(data)/WIDTH), data))*self.window
+            # Take the fft and square each value
+            fftData=abs(np.fft.rfft(indata))**2
+            # find the maximum
+            which = fftData[1:].argmax() + 1
+            # use quadratic interpolation around the max
+            if which and which != len(fftData)-1:
+                y0,y1,y2 = np.log(fftData[which-1:which+2:])
+                x1 = (y2 - y0) * .5 / (2 * y1 - y2 - y0)
+                # find the frequency and output it
+                freq = (which+x1)*RATE/CHUNK
+            else:
+                freq = which*RATE/CHUNK
+        return((freq,vol))
+
+    def convert_to_rgb(self, minval, maxval, val, colors):
+        if val < minval:
+            val = minval
+        if val > maxval:
+            val = maxval
+        EPSILON = sys.float_info.epsilon  # smallest possible difference
+        fi = float(val-minval) / float(maxval-minval) * (len(colors)-1)
+        i = int(fi)
+        f = fi - i
+        if f < EPSILON:
+            return colors[i]
+        else:
+            (r1, g1, b1), (r2, g2, b2) = colors[i], colors[i+1]
+            return int(r1 + f*(r2-r1)), int(g1 + f*(g2-g1)), int(b1 + f*(b2-b1))    
+
 
 def main_loop():
     global read_list
-    
-    color = start_color
-    print "Enter pulse color as triplet or press Return to use",color,
+
+    vol = 0
+    freq = randint(lo_freq, hi_freq)
+
+    print "Enter frequency ({0}-{1}) or press Return to use {2}Hz".\
+            format(lo_freq, hi_freq, int(freq))
     # while still waiting for input on at least one file
     while read_list:
         ready = select.select(read_list, [], [], sleeptime)[0]
@@ -133,15 +224,27 @@ def main_loop():
                 #elif line.rstrip(): # optional: skipping empty lines
                 else:
                     if line.rstrip():
-                        color = tuple(literal_eval(line))
+                        freq = int(literal_eval(line))
                     else:
-                        color = (randint(0,255), randint(0,255), randint(0,255))
-                    print "Color:",color
-                    field.add_pulse(color)
-                    print "Enter pulse color as triplet (128, 0, 64) OR Enter to use last one: ",
+                        freq = randint(lo_freq, hi_freq)
+                vol = volume_threshold
+            print "Enter frequency ({0}-{1}) or press Return to use {2}Hz".\
+                    format(lo_freq, hi_freq, int(freq))
+        else:
+            # print "estimating vol & freq from audio in"
+            (freq, vol) = audio.estimate_freq_vol()
+        if (vol >= volume_threshold):
+            color = audio.convert_to_rgb(lo_freq, hi_freq, freq, color_map)
+            print "vol:", vol, "freq:", freq, "color:", color
+            field.add_pulse(color)
+            vol = 0
         field.run_field()
+
+# instantiate objects
+field = Field()
+audio = Audio()
 
 try:
     main_loop()
 except KeyboardInterrupt:
-    pass
+    audio.terminate()
