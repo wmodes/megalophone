@@ -111,12 +111,8 @@ class Field(object):
         self._incr_pulses()
         # start with all LEDS in field set to 0,0,0
         self._set_field(pulse_bkgd_color)
-        # add each pulse to field
+        # add edge or pulse first
         for pulse_index in range(len(self._pulses)):
-            led_index = self._pulses[pulse_index]['index']
-            led_color = self._pulses[pulse_index]['color']
-            # set center of pulse
-            self._set_pixel(led_index, led_color)
             # set edges of pulse
             for width_index in range(1,((width_of_pulse-1)/2)+1):
                 decay = (1 - pulse_decay) ** width_index
@@ -125,6 +121,11 @@ class Field(object):
                     self._set_pixel(led_index - width_index, dim_color)
                 if (led_index + width_index < leds_in_string-1):
                     self._set_pixel(led_index + width_index, dim_color)
+        # add center of pulse
+        for pulse_index in range(len(self._pulses)):
+            led_index = self._pulses[pulse_index]['index']
+            led_color = self._pulses[pulse_index]['color']
+            self._set_pixel(led_index, led_color)
 
     def _idle_pattern(self):
         # start by advancing pattern
