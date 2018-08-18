@@ -34,7 +34,7 @@ read_list = [sys.stdin]
 leds_in_string = 64
 total_strings = 4
 total_leds = leds_in_string * total_strings
-sleeptime = 0.01 #orig 0.01
+sleeptime = 0.02 #orig 0.01
 
 # pulse constants
 width_of_pulse = 5   # this should be an odd number
@@ -47,19 +47,13 @@ maxbright = 128  # orig 255
 idle_incr = 0.075 # orig 0.4
 
 # sampling constants
-CHUNK = 2048
-WIDTH = 2
-CHANNELS = 1
-RATE = 44100
-RECORD_SECONDS = 0.05
+sample_chunk = 1028
+sample_width = 2
+sample_channels = 1
+sample_rate = 44100
+sample_sec = 0.05
 
 # sound constants
-SCALE = 40
-TOP = 10
-LOFREQ = 100
-HIFREQ = 800
-LOVOL = 30
-HIVOL = 100
 volume_threshold = 55
 lo_freq = 100
 hi_freq = 800
@@ -108,6 +102,8 @@ class Field(object):
                 
 
     def _pulse_pattern(self):
+        # start by advancing pattern
+        self._incr_pulses()
         # start with all LEDS in field set to 0,0,0
         self._set_field(pulse_bkgd_color)
         # add each pulse to field
@@ -124,9 +120,9 @@ class Field(object):
                     self._set_pixel(led_index - width_index, dim_color)
                 if (led_index + width_index < leds_in_string-1):
                     self._set_pixel(led_index + width_index, dim_color)
-        self._incr_pulses()
 
     def _idle_pattern(self):
+        # start by advancing pattern
         t = self._idle_marker
         self._idle_marker += idle_incr
         b = int(minbright + ((1 + math.sin(t))/2) * (maxbright-minbright))
@@ -175,22 +171,22 @@ class Audio(object):
         # create a pyaudio object
         self.p = pyaudio.PyAudio()
         # use a Blackman window
-        self.window = np.blackman(CHUNK)
+        self.window = np.blackman(sample_chunk)
         # open a stream to audio in
-        self.stream = self.p.open(format=self.p.get_format_from_width(WIDTH),
-                        channels=CHANNELS,
-                        rate=RATE,
+        self.stream = self.p.open(format=self.p.get_format_from_width(sample_width),
+                        channels=sample_channels,
+                        rate=sample_rate,
                         input=True,
                         output=True,
-                        frames_per_buffer=CHUNK)
+                        frames_per_buffer=sample_chunk)
 
     def terminate(self):
         self.stream.close()
         self.p.terminate()
 
     def estimate_freq_vol(self):
-        for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-            data = self.stream.read(CHUNK, exception_on_overflow = False)
+        for i in range(0, int(sample_rate / sample_chunk * sample_sec)):
+            data = self.stream.read(sample_chunk, exception_on_overflow = False)
             # get the volume
             rms = audioop.rms(data, 2)
             # convert to decibels
@@ -199,7 +195,7 @@ class Audio(object):
             else:
                 vol = 0
             # unpack the data and times by the hamming window
-            indata = np.array(struct.unpack("%dh"%(len(data)/WIDTH), data))*self.window
+            indata = np.array(struct.unpack("%dh"%(len(data)/sample_width), data))*self.window
             # Take the fft and square each value
             fftData=abs(np.fft.rfft(indata))**2
             # find the maximum
@@ -209,9 +205,9 @@ class Audio(object):
                 y0,y1,y2 = np.log(fftData[which-1:which+2:])
                 x1 = (y2 - y0) * .5 / (2 * y1 - y2 - y0)
                 # find the frequency and output it
-                freq = (which+x1)*RATE/CHUNK
+                freq = (which+x1)*sample_rate/sample_chunk
             else:
-                freq = which*RATE/CHUNK
+                freq = which*sample_rate/sample_chunk
         return((freq,vol))
   
 
