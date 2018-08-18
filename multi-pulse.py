@@ -34,7 +34,7 @@ read_list = [sys.stdin]
 leds_in_string = 64
 total_strings = 4
 total_leds = leds_in_string * total_strings
-sleeptime = 0.02 #orig 0.01
+sleeptime = 0.0001 #orig 0.01
 
 # pulse constants
 width_of_pulse = 5   # this should be an odd number
@@ -59,8 +59,13 @@ lo_freq = 100
 hi_freq = 800
 
 # color constants
-#color_map = [(0, 0, 255), (0, 255, 0), (255, 0, 0)]  # [BLUE, GREEN, RED]
-color_map = [(255,0,0), (255,128,0), (255,255,0), (255,255,255)]  # red, orange, yellow, white
+# blue > green > red
+#color_map = [(0, 0, 255), (0, 255, 0), (255, 0, 0)]
+# red > orange > yellow > white
+#color_map = [(255,0,0), (255,128,0), (255,255,0), (255,255,255)]  
+# green > g-y > yellow > orange > red > violet > blue
+color_map = [(0,255,0), (128,255,0), (255,255,0), (255,128,0), (255,0,0), (128,0,128), (0,0,255)] 
+
 
 class Field(object):
     """FadeCandy field with idle and pulse functions"""

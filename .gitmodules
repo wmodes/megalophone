@@ -4,3 +4,6 @@
 [submodule "lib/fadecandy"]
 	path = lib/fadecandy
 	url = https://github.com/scanlime/fadecandy.git
+[submodule "lib/pyaudio"]
+	path = lib/pyaudio
+	url = http://people.csail.mit.edu/hubert/git/pyaudio.git
