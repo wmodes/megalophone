@@ -194,12 +194,15 @@ def main_loop():
     vol = 0
     freq = randint(lo_freq, hi_freq)
 
-    print "Enter frequency ({0}-{1}) or press Return to use {2}Hz".\
-            format(lo_freq, hi_freq, int(freq))
+    if keyboard_enabled:
+        print "Enter frequency ({0}-{1}) or press Return to use {2}Hz".\
+                format(lo_freq, hi_freq, int(freq))
     # while still waiting for input on at least one file
-    while read_list:
-        ready = select.select(read_list, [], [], sleeptime)[0]
-        if ready:
+    #while read_list:
+    while True:
+        if keyboard_enabled:
+            ready = select.select(read_list, [], [], sleeptime)[0]
+        if keyboard_enabled and ready:
             for file in ready:
                 line = file.readline()
                 if not line: # EOF, remove file from input list
