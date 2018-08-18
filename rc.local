@@ -1,0 +1,10 @@
+# Add to /etc/rc.local
+
+# start fadecandy server
+# if you've installed in globally
+#/usr/local/bin/fcserver /usr/local/bin/fcserver.json >/var/log/fcserver.log 2>&1 &
+# if in the megalophone directory
+/home/pi/megalophone/lib/fadecandy/bin/fcserver-rpi /home/pi/megalophone/lib/fadecandy/server/config.json 2>&1 &
+
+# start megalophone script
+/usr/bin/python /home/pi/megalophone/megalophone.py
