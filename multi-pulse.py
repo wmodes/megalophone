@@ -34,7 +34,7 @@ read_list = [sys.stdin]
 leds_in_string = 64
 total_strings = 4
 total_leds = leds_in_string * total_strings
-sleeptime = 0.02 #orig 0.01
+sleeptime = 0.01 #orig 0.01
 
 # pulse constants
 width_of_pulse = 5   # this should be an odd number
