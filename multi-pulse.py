@@ -153,6 +153,7 @@ class Field(object):
             val = maxval
         if val < minval:
             val = minval
+        EPSILON = sys.float_info.epsilon  # smallest possible difference
         # determine where val falls within the entire range
         fi = float(val-minval) / float(maxval-minval) * (len(colors)-1)
         # determine between which color points val falls
