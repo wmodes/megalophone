@@ -60,12 +60,13 @@ LOFREQ = 100
 HIFREQ = 800
 LOVOL = 30
 HIVOL = 100
-volume_threshold = 60
+volume_threshold = 55
 lo_freq = 100
 hi_freq = 800
 
 # color constants
-color_map = [(0, 0, 255), (0, 255, 0), (255, 0, 0)]  # [BLUE, GREEN, RED]
+#color_map = [(0, 0, 255), (0, 255, 0), (255, 0, 0)]  # [BLUE, GREEN, RED]
+color_map = [(255,0,0), (255,128,0), (255,255,0), (255,255,255)]  # red, orange, yellow, white
 
 class Field(object):
     """FadeCandy field with idle and pulse functions"""
@@ -144,6 +145,29 @@ class Field(object):
         self.light_field()
         time.sleep(sleeptime)
 
+    def convert_to_rgb(self, minval, maxval, val, colors):
+        # https://stackoverflow.com/questions/20792445/calculate-rgb-value-for-a-range-of-values-to-create-heat-map
+        # colors specifies a series of points deliniating color ranges
+        # make sure val is within range
+        if val > maxval:
+            val = maxval
+        if val < minval:
+            val = minval
+        # determine where val falls within the entire range
+        fi = float(val-minval) / float(maxval-minval) * (len(colors)-1)
+        # determine between which color points val falls
+        i = int(fi)
+        # determine where val falls within that range
+        f = fi - i
+        # does it fall on one of the color points?
+        if f < EPSILON:
+            return colors[i]
+        else:
+            # otherwise return the color within the range it corresponds
+            (r1, g1, b1), (r2, g2, b2) = colors[i], colors[i+1]
+            return int(r1 + f*(r2-r1)), int(g1 + f*(g2-g1)), int(b1 + f*(b2-b1)) 
+
+
 class Audio(object):
     """Audio object to receive input and convert to colors"""
     def __init__(self):
@@ -188,21 +212,7 @@ class Audio(object):
             else:
                 freq = which*RATE/CHUNK
         return((freq,vol))
-
-    def convert_to_rgb(self, minval, maxval, val, colors):
-        if val < minval:
-            val = minval
-        if val > maxval:
-            val = maxval
-        EPSILON = sys.float_info.epsilon  # smallest possible difference
-        fi = float(val-minval) / float(maxval-minval) * (len(colors)-1)
-        i = int(fi)
-        f = fi - i
-        if f < EPSILON:
-            return colors[i]
-        else:
-            (r1, g1, b1), (r2, g2, b2) = colors[i], colors[i+1]
-            return int(r1 + f*(r2-r1)), int(g1 + f*(g2-g1)), int(b1 + f*(b2-b1))    
+  
 
 
 def main_loop():
@@ -234,7 +244,7 @@ def main_loop():
             # print "estimating vol & freq from audio in"
             (freq, vol) = audio.estimate_freq_vol()
         if (vol >= volume_threshold):
-            color = audio.convert_to_rgb(lo_freq, hi_freq, freq, color_map)
+            color = field.convert_to_rgb(lo_freq, hi_freq, freq, color_map)
             print "vol:", vol, "freq:", freq, "color:", color
             field.add_pulse(color)
             vol = 0
