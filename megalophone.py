@@ -40,7 +40,7 @@ class Field(object):
     def __init__(self):
         self._pulses = []
         self._pixels = []
-        self._idle_marker = 0
+        self._idle_marker = idle_start
 
     def _set_pixel(self, led_index, color):
         if (0 <= led_index <= leds_in_string-1):
@@ -75,6 +75,8 @@ class Field(object):
                 
 
     def _pulse_pattern(self):
+        # restart idle
+        self._idle_marker = idle_start
         # start by advancing pattern
         self._incr_pulses()
         # start with all LEDS in field set to 0,0,0

@@ -11,6 +11,7 @@ pulse_decay = 0.90
 pulse_bkgd_color = (32,32,32)
 
 # idle constants
+idle_start = 4.8
 minbright = 16   # orig 1.25
 maxbright = 128  # orig 255
 idle_incr = 0.075 # orig 0.4
