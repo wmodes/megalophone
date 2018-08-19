@@ -1,6 +1,6 @@
 # general constants
 leds_in_string = 64
-total_strings = 6
+total_strings = 8
 total_leds = leds_in_string * total_strings
 sleeptime = 0.0001 #orig 0.01
 keyboard_enabled = False
